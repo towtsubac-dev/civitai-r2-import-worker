@@ -16,5 +16,6 @@ jobs:
           node-version: '22'
       - run: npm install --no-audit --no-fund
       - run: node --check src/index.js
+      - run: node --test
       - name: Bundle Worker without deploying
         run: npx --yes wrangler@4 deploy --dry-run --outdir ./dist
