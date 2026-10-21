@@ -1,0 +1,45 @@
+name: Direct Civitai to R2 test (Free Workers)
+on:
+  workflow_dispatch:
+    inputs:
+      model_version_id:
+        description: "Civitai version ID (public safetensors, max 512 MiB)"
+        required: true
+        type: string
+permissions:
+  contents: read
+concurrency:
+  group: civitai-direct-r2-test
+  cancel-in-progress: false
+jobs:
+  transfer:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment: civitai-import-test
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Python transfer dependencies
+        run: python -m pip install --disable-pip-version-check 'boto3>=1.35,<2' 'requests>=2.32,<3'
+      - name: Validate required secrets
+        env:
+          CIVITAI_API_TOKEN: ${{ secrets.CIVITAI_API_TOKEN }}
+          R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+        run: |
+          python - <<'PY'
+          import os
+          names = ["CIVITAI_API_TOKEN", "R2_ACCOUNT_ID", "R2_ACCESS_KEY_ID", "R2_SECRET_ACCESS_KEY"]
+          missing = [name for name in names if not os.getenv(name)]
+          if missing:
+              raise SystemExit("Missing GitHub Actions secrets: " + ", ".join(missing))
+          print("Required credentials configured")
+          PY
+      - name: Download, verify SHA256 and upload to test R2
+        env:
+          MODEL_VERSION_ID: ${{ inputs.model_version_id }}
+          CIVITAI_API_TOKEN: ${{ secrets.CIVITAI_API_TOKEN }}
+          R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+        run: python scripts/direct_r2_import.py
