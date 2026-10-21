@@ -1,7 +1,12 @@
 name: Direct Civitai to R2 test (Free Workers)
+run-name: 'R2 import ${{ inputs.request_id }}'
 on:
   workflow_dispatch:
     inputs:
+      request_id:
+        description: "Web UI request correlation ID"
+        required: false
+        type: string
       model_version_id:
         description: "Civitai version ID (public safetensors, max 512 MiB)"
         required: true
