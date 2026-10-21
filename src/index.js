@@ -49,9 +49,13 @@ async function importVersion(env, payload) {
   const versionId = payload.modelVersionId;
   if (!Number.isSafeInteger(versionId) || versionId < 1) throw error("Invalid modelVersionId");
   const { file, version } = await getVersion(versionId, env.CIVITAI_API_TOKEN);
-  const url = new URL("https://civitai.com/api/download/models/" + versionId);
-  if (env.CIVITAI_API_TOKEN) url.searchParams.set("token", env.CIVITAI_API_TOKEN);
-  const download = await fetch(url.toString(), { redirect: "follow" });
+  // Authenticate the initial Civitai request with the bearer token. A query token
+  // alone may not authorize downloads for models requiring account access.
+  // Fetch the exact file URL returned by version metadata when available.
+  const url = new URL(file.downloadUrl || "https://civitai.com/api/download/models/" + versionId);
+  if (url.protocol !== "https:" || url.hostname !== "civitai.com") throw error("Unexpected Civitai download URL", 502);
+  const headers = env.CIVITAI_API_TOKEN ? { Authorization: "Bearer " + env.CIVITAI_API_TOKEN } : {};
+  const download = await fetch(url.toString(), { headers, redirect: "follow" });
   if (!download.ok || !download.body) throw error("Civitai download failed (" + download.status + ")", 502);
   const length = Number(download.headers.get("content-length"));
   if (Number.isFinite(length) && length > MAX_BYTES) { await download.body.cancel(); throw error("File exceeds 512 MiB"); }
