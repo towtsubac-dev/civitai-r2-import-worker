@@ -63,7 +63,7 @@ export async function handleUi(request,env,path){
         if(k.endsWith(".lora_up.weight"))up++;
         if(k.endsWith(".lora_down.weight"))down++;
         if(k.endsWith(".alpha"))alpha++;
-        if(shapes.length<25&&(/lora_up\\.weight$|lora_down\\.weight$/.test(k)))shapes.push({key:k,shape:t.shape,dtype:t.dtype});
+        if(shapes.length<25&&(k.endsWith(".lora_up.weight")||k.endsWith(".lora_down.weight")))shapes.push({key:k,shape:t.shape,dtype:t.dtype});
       }
       return respond({tensorCount:keys.length,keySamples:keys.slice(0,35),metadata:safeMeta,blockCounts:counts,up,down,alpha,invalid,shapeSamples:shapes});
     }catch{return respond({error:"Could not inspect safetensors header"},502)}
