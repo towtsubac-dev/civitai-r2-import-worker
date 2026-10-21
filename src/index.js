@@ -11,7 +11,7 @@ async function authorized(request, secret, body) {
   if (!secret) throw error("Signing secret not configured", 503);
   const timestamp = request.headers.get("x-import-timestamp");
   const signature = request.headers.get("x-import-signature");
-  if (!timestamp || !/^\\d{13}$/.test(timestamp) || !signature || !/^[a-f0-9]{64}$/i.test(signature)) {
+  if (!timestamp || !/^\d{13}$/.test(timestamp) || !signature || !/^[a-f0-9]{64}$/i.test(signature)) {
     throw error("Missing or invalid signature", 401);
   }
   if (Math.abs(Date.now() - Number(timestamp)) > MAX_AGE_MS) throw error("Expired signature", 401);
@@ -36,7 +36,7 @@ async function getVersion(versionId, token) {
   const response = await fetch("https://civitai.com/api/v1/model-versions/" + versionId, { headers, redirect: "follow" });
   if (!response.ok) throw error("Civitai metadata request failed (" + response.status + ")", 502);
   const version = await response.json();
-  const file = (version.files || []).find(f => f.type === "Model" && /\\.safetensors$/i.test(f.name || "") && /^[a-f0-9]{64}$/i.test(f.hashes?.SHA256 || ""));
+  const file = (version.files || []).find(f => f.type === "Model" && /\.safetensors$/i.test(f.name || "") && /^[a-f0-9]{64}$/i.test(f.hashes?.SHA256 || ""));
   if (!file) throw error("No SHA-256 verified safetensors file found");
   if (!Number.isSafeInteger(file.sizeKB) && !Number.isFinite(file.sizeKB)) throw error("File size missing");
   const approximateBytes = Math.ceil(file.sizeKB * 1024);
