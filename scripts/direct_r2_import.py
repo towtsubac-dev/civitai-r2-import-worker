@@ -65,6 +65,7 @@ def main():
         region_name="auto",
     )
     key = "imports/" + str(uuid.uuid4()) + ".safetensors"
+    object_metadata = {"civitai-version-id": version_id, "civitai-model-id": str(version.get("modelId", "")), "civitai-base-model": str(version.get("baseModel", ""))[:150], "civitai-model-name": str(version.get("model", {}).get("name", ""))[:150], "civitai-version-name": str(version.get("name", ""))[:150], "civitai-filename": str(file.get("name", ""))[:150]}
     upload_id = None
     parts = []
     digest = hashlib.sha256()
@@ -99,7 +100,7 @@ def main():
             while len(buffer) >= PART_BYTES:
                 if upload_id is None:
                     upload_id = s3.create_multipart_upload(
-                        Bucket=BUCKET, Key=key, ContentType="application/octet-stream"
+                        Bucket=BUCKET, Key=key, ContentType="application/octet-stream", Metadata=object_metadata
                     )["UploadId"]
                 part = bytes(buffer[:PART_BYTES])
                 del buffer[:PART_BYTES]
@@ -117,7 +118,7 @@ def main():
         if upload_id is None:
             # For files smaller than one multipart part, upload only after validation.
             s3.put_object(Bucket=BUCKET, Key=key, Body=bytes(buffer),
-                          ContentType="application/octet-stream")
+                          ContentType="application/octet-stream", Metadata=object_metadata)
         else:
             if buffer:
                 number = len(parts) + 1
