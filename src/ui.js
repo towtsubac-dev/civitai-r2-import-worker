@@ -37,7 +37,7 @@ export async function handleUi(request,env,path){
     if(!(await matches(request.headers.get("X-Import-Password")||"",env.UI_IMPORT_PASSWORD)))return respond({error:"Unauthorized"},401);
     if(!env.LORA_BUCKET)return respond({error:"R2 binding not configured"},503);
     const key=new URL(request.url).searchParams.get("key")||"";
-    if(!/^imports\\/[a-f0-9-]{36}\\.safetensors$/.test(key))return respond({error:"Invalid R2 key"},400);
+    if(!key.startsWith("imports/")||!/^imports\/[0-9a-f-]{36}\.safetensors$/.test(key))return respond({error:"Invalid R2 key"},400);
     try {
       const first=await env.LORA_BUCKET.get(key,{range:{offset:0,length:8}});
       if(!first)return respond({error:"File not found"},404);
