@@ -53,9 +53,21 @@ jobs:
               body,
               signal: controller.signal
             });
-            const result = await response.json().catch(() => ({}));
+            const contentType = response.headers.get("content-type") || "";
+            const ray = response.headers.get("cf-ray") || "none";
+            const server = response.headers.get("server") || "unknown";
+            const responseText = await response.text();
+            let result = {};
+            if (contentType.includes("application/json")) {
+              try { result = JSON.parse(responseText); } catch {}
+            }
             if (!response.ok) {
-              console.error("Import failed (HTTP " + response.status + "): " + String(result.error || "Unknown error"));
+              console.error("Import failed (HTTP " + response.status + ")");
+              console.error("Response metadata:", JSON.stringify({
+                content_type: contentType, server, cf_ray: ray,
+                response_bytes: responseText.length,
+                json_error: typeof result.error === "string" ? result.error : null
+              }));
               process.exitCode = 1;
             } else {
               console.log("Import completed:", JSON.stringify({
