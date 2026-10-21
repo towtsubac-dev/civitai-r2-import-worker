@@ -1,3 +1,4 @@
+import { handleUi } from "./ui.js";
 import { sha256 } from "@noble/hashes/sha256";
 
 const MAX_BYTES = 512 * 1024 * 1024;
@@ -146,6 +147,7 @@ async function diagnoseDownload(env, payload) {
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
+    if (url.pathname === "/ui" || url.pathname === "/ui/dispatch") return handleUi(request, env, url.pathname);
     if (request.method === "GET" && url.pathname === "/health") {
       return json({ status: "ok", service: "civitai-r2-import", import_enabled: true,
         r2_binding: Boolean(env.LORA_BUCKET), signing_secret_configured: Boolean(env.LORA_IMPORT_SIGNING_SECRET) });
