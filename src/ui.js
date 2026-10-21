@@ -5,7 +5,7 @@ const html = `<!doctype html>
 <main><h2>Civitai → R2 テスト</h2><p>モデルURLまたはバージョンIDを指定して、GitHub ActionsでR2テストバケットに転送します。</p>
 <form id="f"><label for="url">Civitai URL / バージョンID</label><input id="url" required placeholder="https://civitai.com/models/...?...modelVersionId=3228867">
 <label for="pass">テスト画面用パスワード</label><input id="pass" type="password" required autocomplete="off">
-<button id="submit">転送を開始</button></form><p><small>保存先: civitai-lora-test / imports/ （本番環境には保存しません）</small></p><pre id="result" role="status" aria-live="polite"></pre><button id="refresh" type="button" hidden>状況を更新</button><p id="details"></p><hr><h3>R2 保存済みファイル</h3><button id="filesBtn" type="button">一覧を更新</button><p><small>テストバケット内の最大100件を表示（読み取り専用）</small></p><select id="files" size="6" style="width:100%;background:#fff;color:#111" aria-label="保存済みファイル"></select><pre id="fileDetails" role="status"></pre><label for="lookupVersion">既存ファイルのCivitaiバージョンID照合</label><input id="lookupVersion" inputmode="numeric" placeholder="例: 3203205"><button id="lookupBtn" type="button">モデル情報を照合（保存しない）</button><pre id="lookupResult" role="status"></pre></main>
+<button id="submit">転送を開始</button></form><p><small>保存先: civitai-lora-test / imports/ （本番環境には保存しません）</small></p><pre id="result" role="status" aria-live="polite"></pre><button id="refresh" type="button" hidden>状況を更新</button><p id="details"></p><hr><h3>R2 保存済みファイル</h3><button id="filesBtn" type="button">一覧を更新</button><p><small>テストバケット内の最大100件を表示（読み取り専用）</small></p><select id="files" size="6" style="width:100%;background:#fff;color:#111" aria-label="保存済みファイル"></select><pre id="fileDetails" role="status"></pre><label for="lookupVersion">既存ファイルのCivitaiバージョンID照合</label><input id="lookupVersion" inputmode="numeric" placeholder="例: 3203205"><button id="lookupBtn" type="button">モデル情報を照合（保存しない）</button><pre id="lookupResult" role="status"></pre><button id="inspectBtn" type="button">選択ファイルの内部構造を確認（読み取り専用）</button><pre id="inspectResult" role="status"></pre></main>
 <script>
 const form=document.querySelector('#f'),out=document.querySelector('#result'),btn=document.querySelector('#submit'),refresh=document.querySelector('#refresh'),details=document.querySelector('#details');let requestId=null,poll=null,pollCount=0;
 function versionId(input){const s=input.trim();if(/^[0-9]+$/.test(s))return s;let u;try{u=new URL(s)}catch{throw Error('URLまたはバージョンIDを入力してください')}if(u.protocol!=='https:'||u.hostname!=='civitai.com')throw Error('civitai.com のURLを入力してください');const id=u.searchParams.get('modelVersionId');if(!id||!/^[0-9]+$/.test(id))throw Error('URLに modelVersionId がありません。バージョンIDを直接入力してください');return id}
@@ -13,6 +13,7 @@ async function checkStatus(){if(!requestId)return;try{const r=await fetch('/ui/s
 async function loadFiles(){filesBtn.disabled=true;fileDetails.textContent='一覧を取得しています…';try{const r=await fetch('/ui/files',{headers:{'X-Import-Password':document.querySelector('#pass').value}});const j=await r.json();if(!r.ok)throw Error(j.error||'取得失敗');savedFiles=j.files||[];files.replaceChildren();for(const f of savedFiles){const o=document.createElement('option');o.value=f.key;o.textContent=(f.meta['civitai-model-name']?f.meta['civitai-model-name']+' / '+(f.meta['civitai-version-name']||'')+' — ':'')+f.key;files.appendChild(o)}fileDetails.textContent=savedFiles.length+' 件表示'+(j.truncated?'（続きがあります）':'');if(savedFiles.length){files.selectedIndex=0;showFile()}}catch(e){fileDetails.textContent='一覧取得エラー: '+e.message}finally{filesBtn.disabled=false}}
 function showFile(){const f=savedFiles.find(x=>x.key===files.value);if(f)fileDetails.textContent='保存先: '+f.key+'\\n容量: '+(f.size/1048576).toFixed(2)+' MiB\\n更新: '+f.uploaded+'\\nモデル名: '+(f.meta['civitai-model-name']||'記録なし（以前の転送）')+'\\nバージョンID: '+(f.meta['civitai-version-id']||'記録なし')+'\\nベースモデル: '+(f.meta['civitai-base-model']||'記録なし')}
 const lookupBtn=document.querySelector('#lookupBtn'),lookupResult=document.querySelector('#lookupResult');lookupBtn.addEventListener('click',async()=>{const f=savedFiles.find(x=>x.key===files.value),id=document.querySelector('#lookupVersion').value.trim();if(!f){lookupResult.textContent='先に保存済みファイルを選択してください';return}if(!/^[1-9][0-9]{0,14}$/.test(id)){lookupResult.textContent='正しいバージョンIDを入力してください';return}lookupBtn.disabled=true;lookupResult.textContent='Civitai情報を照合中…';try{const r=await fetch('/ui/lookup?id='+encodeURIComponent(id),{headers:{'X-Import-Password':document.querySelector('#pass').value}}),j=await r.json();if(!r.ok)throw Error(j.error||'取得失敗');const same=j.files.filter(x=>x.sizeKB>0&&Math.abs(x.sizeKB*1024-f.size)<Math.max(1048576,f.size*0.005));lookupResult.textContent='Civitaiモデル: '+j.modelName+'\\nバージョン: '+j.versionName+' (ID '+id+')\\nベースモデル: '+j.baseModel+'\\n容量の近いファイル: '+(same.length?same.map(x=>x.name).join(', '):'なし')+'\\n判定: '+(same.length?'容量は整合。ただし同一ファイルとは未検証':'容量が一致せず、別ファイルの可能性あり')+'\\n※R2の内容・メタデータは変更していません'}catch(e){lookupResult.textContent='照合エラー: '+e.message}finally{lookupBtn.disabled=false}});files.addEventListener('change',()=>{lookupResult.textContent='';});
+document.querySelector('#inspectBtn').addEventListener('click',async()=>{const key=files.value,out=document.querySelector('#inspectResult'),btn=document.querySelector('#inspectBtn');if(!key){out.textContent='先にファイルを選択してください';return}btn.disabled=true;out.textContent='ヘッダーを読み取り中…';try{const r=await fetch('/ui/inspect?key='+encodeURIComponent(key),{headers:{'X-Import-Password':document.querySelector('#pass').value}}),j=await r.json();if(!r.ok)throw Error(j.error||'読み取り失敗');out.textContent='テンソル数: '+j.tensorCount+'\\nキー例:\\n'+j.keySamples.join('\\n')+'\\nメタデータ:\\n'+JSON.stringify(j.metadata,null,2)+'\\n※モデル全体はダウンロードしていません'}catch(e){out.textContent='確認エラー: '+e.message}finally{btn.disabled=false}});
 files.addEventListener('change',showFile);filesBtn.addEventListener('click',loadFiles);
 refresh.addEventListener('click',checkStatus);
 form.addEventListener('submit',async e=>{e.preventDefault();btn.disabled=true;out.textContent='開始しています…';try{const id=versionId(document.querySelector('#url').value);const password=document.querySelector('#pass').value;const r=await fetch('/ui/dispatch',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({modelVersionId:id,password})});const j=await r.json();if(!r.ok)throw Error(j.error||'開始できませんでした');requestId=j.request_id;pollCount=0;refresh.hidden=false;details.textContent='';out.textContent='開始待ち';if(poll)clearInterval(poll);poll=setInterval(checkStatus,10000);await checkStatus()}catch(err){out.textContent='エラー: '+err.message}finally{btn.disabled=false}});
@@ -29,8 +30,33 @@ async function matches(a,b) {
 export async function handleUi(request,env,path){
   if(path==="/ui"&&request.method==="GET")
     return new Response(html,{headers:{"Content-Type":"text/html; charset=utf-8","Cache-Control":"no-store","Content-Security-Policy":"default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; connect-src 'self'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'","X-Content-Type-Options":"nosniff","Referrer-Policy":"no-referrer"}});
-  if(path!=="/ui/dispatch"&&path!=="/ui/status"&&path!=="/ui/files"&&path!=="/ui/lookup")return respond({error:"Not found"},404);
+  if(path!=="/ui/dispatch"&&path!=="/ui/status"&&path!=="/ui/files"&&path!=="/ui/lookup"&&path!=="/ui/inspect")return respond({error:"Not found"},404);
   if(!env.UI_IMPORT_PASSWORD||!env.GITHUB_DISPATCH_TOKEN)return respond({error:"UI dispatch not configured"},503);
+  if(path==="/ui/inspect") {
+    if(request.method!=="GET")return respond({error:"Method not allowed"},405);
+    if(!(await matches(request.headers.get("X-Import-Password")||"",env.UI_IMPORT_PASSWORD)))return respond({error:"Unauthorized"},401);
+    if(!env.LORA_BUCKET)return respond({error:"R2 binding not configured"},503);
+    const key=new URL(request.url).searchParams.get("key")||"";
+    if(!/^imports\\/[a-f0-9-]{36}\\.safetensors$/.test(key))return respond({error:"Invalid R2 key"},400);
+    try {
+      const first=await env.LORA_BUCKET.get(key,{range:{offset:0,length:8}});
+      if(!first)return respond({error:"File not found"},404);
+      const prefix=new Uint8Array(await first.arrayBuffer());
+      if(prefix.length!==8)return respond({error:"Invalid safetensors prefix"},422);
+      const length=Number(new DataView(prefix.buffer).getBigUint64(0,true));
+      if(!Number.isSafeInteger(length)||length<2||length>8*1024*1024)return respond({error:"Header exceeds 8 MiB limit or is invalid"},422);
+      const part=await env.LORA_BUCKET.get(key,{range:{offset:8,length}});
+      if(!part)return respond({error:"Header not found"},404);
+      const bytes=await part.arrayBuffer();
+      if(bytes.byteLength!==length)return respond({error:"Incomplete header"},422);
+      const header=JSON.parse(new TextDecoder().decode(bytes));
+      const keys=Object.keys(header).filter(k=>k!=="__metadata__");
+      const meta=header.__metadata__||{};
+      const safeMeta={};
+      for(const [k,v] of Object.entries(meta).slice(0,15))safeMeta[String(k).slice(0,100)]=String(v).slice(0,300);
+      return respond({tensorCount:keys.length,keySamples:keys.slice(0,35),metadata:safeMeta});
+    }catch{return respond({error:"Could not inspect safetensors header"},502)}
+  }
   if(path==="/ui/lookup") {
     if(request.method!=="GET")return respond({error:"Method not allowed"},405);
     if(!(await matches(request.headers.get("X-Import-Password")||"",env.UI_IMPORT_PASSWORD)))return respond({error:"Unauthorized"},401);
