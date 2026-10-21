@@ -9,3 +9,7 @@ Cloudflare Workers Builds: connect this repository, select main, leave build com
 Later, configure an R2 binding named `LORA_BUCKET` pointing to a separate test bucket and a secret `LORA_IMPORT_SIGNING_SECRET`. Never paste secret values into GitHub.
 
 Large-file importer (HMAC validation, Civitai metadata lookup, streaming R2 multipart transfer, SHA-256 and safetensors validation, cleanup, and UI integration) is **not implemented** yet. Do not enable production use until end-to-end tests pass.
+
+## Deployment trigger
+
+A push to `main` should trigger Cloudflare Workers Builds. After deployment, `GET /health` returns JSON (rather than the original Hello World response). Check that the build deploy command is `npx wrangler deploy` and that the GitHub integration has access to this repository.
