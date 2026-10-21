@@ -1,0 +1,26 @@
+name: Verify deployed Worker authentication
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check health without exposing secrets
+        run: |
+          set -euo pipefail
+          curl --fail --silent --show-error --retry 3 \
+            https://civitai-r2-import-preview.towtsubac.workers.dev/health \
+            -o health.json
+          node -e 'const h=require("./health.json"); if(h.status!=="ok" || !h.import_enabled || !h.r2_binding || !h.signing_secret_configured) process.exit(1); console.log("Worker ready; R2 and signing secret configured")'
+      - name: Ensure unsigned POST is rejected
+        run: |
+          set -euo pipefail
+          status=$(curl --silent --show-error --output response.json --write-out '%{http_code}' \
+            --request POST \
+            --header 'Content-Type: application/json' \
+            --data '{"modelVersionId":1}' \
+            https://civitai-r2-import-preview.towtsubac.workers.dev/import)
+          echo "Unsigned POST status: $status"
+          test "$status" = "401"
