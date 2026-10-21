@@ -116,6 +116,33 @@ async function importVersion(env, payload) {
   }
 }
 
+async function diagnoseDownload(env, payload) {
+  const versionId = payload.modelVersionId;
+  if (!Number.isSafeInteger(versionId) || versionId < 1) throw error("Invalid modelVersionId");
+  const configured = Boolean(env.CIVITAI_API_TOKEN);
+  const { file } = await getVersion(versionId, env.CIVITAI_API_TOKEN);
+  const start = new URL(file.downloadUrl || "https://civitai.com/api/download/models/" + versionId);
+  if (start.protocol !== "https:" || start.hostname !== "civitai.com") throw error("Unexpected Civitai download URL", 502);
+  let target = start;
+  const hops = [];
+  for (let i = 0; i < 4; i++) {
+    const headers = i === 0 && configured ? { Authorization: "Bearer " + env.CIVITAI_API_TOKEN } : {};
+    const response = await fetch(target.toString(), { method: "GET", headers, redirect: "manual" });
+    const location = response.headers.get("location");
+    const redirect = [301, 302, 303, 307, 308].includes(response.status);
+    const next = redirect && location ? new URL(location, target) : null;
+    // Never include URL paths, query strings, response bodies or credentials.
+    hops.push({ step: i + 1, status: response.status,
+      host: target.hostname === "civitai.com" ? "civitai.com" : "external",
+      redirect_to: next ? (next.hostname === "civitai.com" ? "civitai.com" : "external") : null });
+    if (response.body) await response.body.cancel();
+    if (!redirect || !next) break;
+    if (next.protocol !== "https:") throw error("Unsafe redirect", 502);
+    target = next;
+  }
+  return { token_configured: configured, model_version_id: versionId, hops };
+}
+
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
@@ -123,7 +150,7 @@ export default {
       return json({ status: "ok", service: "civitai-r2-import", import_enabled: true,
         r2_binding: Boolean(env.LORA_BUCKET), signing_secret_configured: Boolean(env.LORA_IMPORT_SIGNING_SECRET) });
     }
-    if (request.method !== "POST" || url.pathname !== "/import") return json({ error: "Not found" }, 404);
+    if (request.method !== "POST" || !["/import", "/diagnose"].includes(url.pathname)) return json({ error: "Not found" }, 404);
     try {
       if (Number(request.headers.get("content-length") || 0) > 4096) throw error("Request too large", 413);
       const body = await request.text();
