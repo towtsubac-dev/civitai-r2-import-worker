@@ -158,8 +158,9 @@ export default {
       await authorized(request, env.LORA_IMPORT_SIGNING_SECRET, body);
       const payload = JSON.parse(body);
       if (!payload || typeof payload !== "object") throw error("Invalid request");
-      const result = await importVersion(env, payload);
-      return json(result, 201);
+      const diagnostic = url.pathname === "/diagnose";
+      const result = diagnostic ? await diagnoseDownload(env, payload) : await importVersion(env, payload);
+      return json(result, diagnostic ? 200 : 201);
     } catch (e) {
       return json({ error: e instanceof SyntaxError ? "Invalid JSON" : (e.message || "Import failed") }, (e instanceof SyntaxError ? 400 : (e.status || 500)));
     }
