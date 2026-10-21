@@ -130,7 +130,7 @@ export default {
       const result = await importVersion(env, payload);
       return json(result, 201);
     } catch (e) {
-      return json({ error: e instanceof SyntaxError ? "Invalid JSON" : (e.message || "Import failed") }, e.status || 500);
+      return json({ error: e instanceof SyntaxError ? "Invalid JSON" : (e.message || "Import failed") }, (e instanceof SyntaxError ? 400 : (e.status || 500)));
     }
   }
 };
