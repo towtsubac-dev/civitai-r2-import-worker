@@ -10,6 +10,10 @@
     {
       "binding": "LORA_BUCKET",
       "bucket_name": "civitai-lora-test"
+    },
+    {
+      "binding": "PRODUCTION_LORA_BUCKET",
+      "bucket_name": "minimax-h3-videos"
     }
   ]
 }
