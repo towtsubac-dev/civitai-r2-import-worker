@@ -41,7 +41,7 @@ export async function handleUi(request,env,path){
     if(raw.length>512)return respond({error:"Request too large"},413);
     let payload;try{payload=JSON.parse(raw)}catch{return respond({error:"Invalid JSON"},400)}
     const key=typeof payload.key==="string"?payload.key:"";
-    if(!/^imports\\/[0-9a-f-]{36}\\.safetensors$/.test(key))return respond({error:"Invalid R2 key"},400);
+    if(!key.startsWith("imports/")||!key.endsWith(".safetensors")||key.length!==56||!/^[a-f0-9-]+$/.test(key.slice(8,-12)))return respond({error:"Invalid R2 key"},400);
     try{
       const object=await env.LORA_BUCKET.head(key);
       if(!object)return respond({error:"File not found"},404);
