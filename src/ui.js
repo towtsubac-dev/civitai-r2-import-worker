@@ -28,8 +28,17 @@ async function matches(a,b) {
 export async function handleUi(request,env,path){
   if(path==="/ui"&&request.method==="GET")
     return new Response(html,{headers:{"Content-Type":"text/html; charset=utf-8","Cache-Control":"no-store","Content-Security-Policy":"default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; connect-src 'self'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'","X-Content-Type-Options":"nosniff","Referrer-Policy":"no-referrer"}});
-  if(path!=="/ui/dispatch"&&path!=="/ui/status")return respond({error:"Not found"},404);
+  if(path!=="/ui/dispatch"&&path!=="/ui/status"&&path!=="/ui/files")return respond({error:"Not found"},404);
   if(!env.UI_IMPORT_PASSWORD||!env.GITHUB_DISPATCH_TOKEN)return respond({error:"UI dispatch not configured"},503);
+  if(path==="/ui/files") {
+    if(request.method!=="GET")return respond({error:"Method not allowed"},405);
+    if(!(await matches(request.headers.get("X-Import-Password")||"",env.UI_IMPORT_PASSWORD)))return respond({error:"Unauthorized"},401);
+    if(!env.LORA_BUCKET)return respond({error:"R2 binding not configured"},503);
+    try {
+      const result=await env.LORA_BUCKET.list({prefix:"imports/",limit:100});
+      return respond({files:result.objects.filter(o=>o.key.endsWith(".safetensors")).map(o=>({key:o.key,size:o.size,uploaded:o.uploaded.toISOString()})),truncated:result.truncated});
+    }catch{return respond({error:"R2 file listing failed"},502)}
+  }
   if(path==="/ui/status") {
     if(request.method!=="GET")return respond({error:"Method not allowed"},405);
     if(!(await matches(request.headers.get("X-Import-Password")||"",env.UI_IMPORT_PASSWORD)))return respond({error:"Unauthorized"},401);
