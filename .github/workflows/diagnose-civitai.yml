@@ -1,0 +1,66 @@
+name: Diagnose Civitai download 401
+on:
+  workflow_dispatch:
+    inputs:
+      model_version_id:
+        description: "Civitai model version ID (safetensors LoRA, <=512 MiB)"
+        required: true
+        type: string
+permissions:
+  contents: read
+concurrency:
+  group: civitai-r2-diagnose
+  cancel-in-progress: false
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: civitai-import-test
+    steps:
+      - name: Validate input and signing secret
+        env:
+          VERSION_ID: ${{ inputs.model_version_id }}
+          IMPORT_SECRET: ${{ secrets.LORA_IMPORT_SIGNING_SECRET }}
+        run: |
+          node -e '
+            const id = process.env.VERSION_ID;
+            const secret = process.env.IMPORT_SECRET;
+            if (!/^[1-9][0-9]{0,14}$/.test(id || "")) throw Error("Invalid model version ID");
+            if (!secret || secret.length < 64) throw Error("Missing or short LORA_IMPORT_SIGNING_SECRET repository/environment secret");
+            console.log("Input and secret are configured");
+          '
+      - name: Send authenticated import request
+        env:
+          VERSION_ID: ${{ inputs.model_version_id }}
+          IMPORT_SECRET: ${{ secrets.LORA_IMPORT_SIGNING_SECRET }}
+        run: |
+          node --input-type=module <<'NODE'
+          import { createHmac } from "node:crypto";
+          const body = JSON.stringify({ modelVersionId: Number(process.env.VERSION_ID) });
+          const timestamp = String(Date.now());
+          const signature = createHmac("sha256", process.env.IMPORT_SECRET)
+            .update(timestamp + "." + body).digest("hex");
+          const controller = new AbortController();
+          const timeout = setTimeout(() => controller.abort(), 14 * 60 * 1000);
+          try {
+            const response = await fetch("https://civitai-r2-import-preview.towtsubac.workers.dev/diagnose", {
+              method: "POST",
+              headers: {
+                "content-type": "application/json",
+                "x-import-timestamp": timestamp,
+                "x-import-signature": signature
+              },
+              body,
+              signal: controller.signal
+            });
+            const result = await response.json().catch(() => ({}));
+            if (!response.ok) {
+              console.error("Diagnosis failed (HTTP " + response.status + "): " + String(result.error || "Unknown error"));
+              process.exitCode = 1;
+            } else {
+              console.log("Diagnostic result:", JSON.stringify(result));
+            }
+          } finally {
+            clearTimeout(timeout);
+          }
+          NODE
