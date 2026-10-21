@@ -13,3 +13,7 @@ Large-file importer (HMAC validation, Civitai metadata lookup, streaming R2 mult
 ## Deployment trigger
 
 A push to `main` should trigger Cloudflare Workers Builds. After deployment, `GET /health` returns JSON (rather than the original Hello World response). Check that the build deploy command is `npx wrangler deploy` and that the GitHub integration has access to this repository.
+
+## Deployment verification (2026-10-21)
+
+After merging the streaming-import PR, verify the Cloudflare production build for `main` and check `/health` for `import_enabled: true`. Keep imports restricted to the test R2 bucket. This documentation-only commit triggers a new GitHub-connected build without modifying the Worker implementation.
