@@ -40,7 +40,7 @@ export async function handleUi(request,env,path){
     if(!env.LORA_BUCKET||!env.PRODUCTION_LORA_BUCKET)return respond({error:"R2 bindings not configured"},503);
     let payload;try{const raw=await request.text();if(raw.length>512)return respond({error:"Request too large"},413);payload=JSON.parse(raw)}catch{return respond({error:"Invalid JSON"},400)}
     const key=payload?.key;
-    if(typeof key!=="string"||!/^imports\\/[0-9a-f-]{36}\\.safetensors$/.test(key))return respond({error:"Invalid key"},400);
+    if(typeof key!=="string"||!/^imports\/[0-9a-f-]{36}\.safetensors$/.test(key))return respond({error:"Invalid key"},400);
     const source=await env.LORA_BUCKET.head(key);
     if(!source)return respond({error:"Source LoRA not found"},404);
     const m=source.customMetadata||{};
